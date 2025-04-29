@@ -181,22 +181,33 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
     private fun createChargingStateChangeReceiver(events: EventSink): BroadcastReceiver {
         return object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                publishBatteryStatus(events, convertBatteryStatus(status))
+                publishBatteryStatus(events, convertBatteryStatus(intent))
             }
         }
     }
 
-    private fun convertBatteryStatus(status: Int): String? {
+    private fun convertBatteryStatus(intent: Intent): String {
+        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+
         return when (status) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
             BatteryManager.BATTERY_STATUS_FULL -> "full"
             BatteryManager.BATTERY_STATUS_DISCHARGING -> "discharging"
-            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> "connected_not_charging"
-            BatteryManager.BATTERY_STATUS_UNKNOWN -> "unknown"
-            else -> null
+            BatteryManager.BATTERY_STATUS_NOT_CHARGING -> {
+                if (plugged == BatteryManager.BATTERY_PLUGGED_AC ||
+                    plugged == BatteryManager.BATTERY_PLUGGED_USB ||
+                    (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
+                     plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS)) {
+                    "connected_not_charging"
+                } else {
+                    "discharging"
+                }
+            }
+            else -> "unknown"
         }
     }
+
 
     private fun publishBatteryStatus(events: EventSink, status: String?) {
         if (status != null) {
