@@ -181,15 +181,13 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
     private fun createChargingStateChangeReceiver(events: EventSink): BroadcastReceiver {
         return object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
-                publishBatteryStatus(events, convertBatteryStatus(intent))
+                val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                publishBatteryStatus(events, convertBatteryStatus(status))
             }
         }
     }
 
-    private fun convertBatteryStatus(intent: Intent): String {
-        val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-        val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
-
+    private fun convertBatteryStatus(status: Int): String? {
         return when (status) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
             BatteryManager.BATTERY_STATUS_FULL -> "full"
@@ -201,13 +199,13 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
                      plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS)) {
                     "connected_not_charging"
                 } else {
-                    "discharging"
+                    "not_charging"
                 }
             }
-            else -> "unknown"
+            BatteryManager.BATTERY_STATUS_UNKNOWN -> "unknown"
+            else -> null
         }
     }
-
 
     private fun publishBatteryStatus(events: EventSink, status: String?) {
         if (status != null) {
