@@ -24,7 +24,6 @@ import androidx.annotation.RequiresApi
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.RECEIVER_NOT_EXPORTED
 
-
 /** BatteryPlusPlugin  */
 class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, FlutterPlugin {
     private var applicationContext: Context? = null
@@ -81,7 +80,7 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
         }
     }
 
-    @SuppressLint("WrongConstant") // Error in ContextCompat for RECEIVER_NOT_EXPORTED
+    @SuppressLint("WrongConstant")
     override fun onListen(arguments: Any?, events: EventSink) {
         chargingStateChangeReceiver = createChargingStateChangeReceiver(events)
         applicationContext?.let {
@@ -90,8 +89,11 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
                 IntentFilter(Intent.ACTION_BATTERY_CHANGED), RECEIVER_NOT_EXPORTED
             )
         }
-        val status = getBatteryStatus()
-        publishBatteryStatus(events, status)
+
+        val intent = ContextWrapper(applicationContext).registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+        publishBatteryStatus(events, convertBatteryStatus(status, plugged))
     }
 
     override fun onCancel(arguments: Any?) {
@@ -100,13 +102,10 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
     }
 
     private fun getBatteryStatus(): String? {
-        val status: Int = if (VERSION.SDK_INT >= VERSION_CODES.O) {
-            getBatteryProperty(BatteryManager.BATTERY_PROPERTY_STATUS)
-        } else {
-            val intent = ContextWrapper(applicationContext).registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
-            intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
-        }
-        return convertBatteryStatus(status)
+        val intent = ContextWrapper(applicationContext).registerReceiver(null, IntentFilter(Intent.ACTION_BATTERY_CHANGED))
+        val status = intent?.getIntExtra(BatteryManager.EXTRA_STATUS, -1) ?: -1
+        val plugged = intent?.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1) ?: -1
+        return convertBatteryStatus(status, plugged)
     }
 
     private fun getBatteryLevel(): Int {
@@ -150,8 +149,6 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
         return if (mode != -1) {
             mode == POWER_SAVE_MODE_HUAWEI_VALUE
         } else {
-            // On Devices like the P30 lite, we always get an -1 result code.
-            // Stackoverflow issue: https://stackoverflow.com/a/70500770
             checkPowerServiceSaveMode()
         }
     }
@@ -182,12 +179,13 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
         return object : BroadcastReceiver() {
             override fun onReceive(context: Context, intent: Intent) {
                 val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                publishBatteryStatus(events, convertBatteryStatus(status))
+                val plugged = intent.getIntExtra(BatteryManager.EXTRA_PLUGGED, -1)
+                publishBatteryStatus(events, convertBatteryStatus(status, plugged))
             }
         }
     }
 
-    private fun convertBatteryStatus(status: Int): String? {
+    private fun convertBatteryStatus(status: Int, plugged: Int): String? {
         return when (status) {
             BatteryManager.BATTERY_STATUS_CHARGING -> "charging"
             BatteryManager.BATTERY_STATUS_FULL -> "full"
@@ -196,7 +194,7 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
                 if (plugged == BatteryManager.BATTERY_PLUGGED_AC ||
                     plugged == BatteryManager.BATTERY_PLUGGED_USB ||
                     (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1 &&
-                     plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS)) {
+                            plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS)) {
                     "connected_not_charging"
                 } else {
                     "not_charging"
