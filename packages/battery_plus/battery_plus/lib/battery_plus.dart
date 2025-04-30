@@ -50,7 +50,7 @@ class Battery {
   }
 
   /// Fires whenever the battery state changes.
-  Stream<BatteryState> get onBatteryStateChangedStatus {
+  Stream<BatteryState> get onBatteryStateChanged {
     return _platform.onBatteryStateChanged;
   }
 }
