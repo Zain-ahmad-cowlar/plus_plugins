@@ -197,7 +197,7 @@ class BatteryPlusPlugin : MethodCallHandler, EventChannel.StreamHandler, Flutter
                             plugged == BatteryManager.BATTERY_PLUGGED_WIRELESS)) {
                     "connected_not_charging"
                 } else {
-                    "not_charging"
+                    "discharging"
                 }
             }
             BatteryManager.BATTERY_STATUS_UNKNOWN -> "unknown"
